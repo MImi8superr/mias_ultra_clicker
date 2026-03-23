@@ -1,0 +1,51 @@
+name: Build unsigned iOS IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-ios-unsigned:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Build unsigned iOS app
+        run: flutter build ios --release --no-codesign
+
+      - name: Pack unsigned IPA
+        shell: bash
+        run: |
+          set -e
+          APP_PATH=$(find build/ios/iphoneos -maxdepth 2 -name "Runner.app" | head -n 1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "Runner.app not found"
+            exit 1
+          fi
+
+          rm -rf Payload Runner-unsigned.ipa
+          mkdir Payload
+          cp -R "$APP_PATH" Payload/
+          zip -r Runner-unsigned.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-ipa
+          path: Runner-unsigned.ipa
